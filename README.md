@@ -1,9 +1,10 @@
-# 🎓 Student Support Agent — Agentic AI Engineering (Assignment 1 + 2)
+# 🎓 Student Support Agent — Agentic AI Engineering (Task 1 & Task 2)
 
 One chat agent that answers student queries (fees, scholarships, course change, policies, support tickets).
-**Assignment 1** = agent loop, tools, memory, retrieval, tracing.
-**Assignment 2** = the same agent + identity, authorization, human approval, audit log.
-The student UI always uses safe Assignment 2 mode. `python evaluate.py` compares the Assignment 1 baseline and Assignment 2 controls.
+- **Task 1 (Assignment 1)**: Core agent loop, tools, persistent memory, policy retrieval (RAG), and tracing.
+- **Task 2 (Assignment 2)**: Safe & production controls — student identity, code-level authorization, human approval (HITL), sensitive data redaction, and audit logging.
+
+The student UI runs in safe Task 2 mode by default. Running `python evaluate.py` benchmarks both the Task 1 baseline and Task 2 controls side-by-side.
 
 ## 1. How to run
 ```bash
@@ -65,7 +66,7 @@ sample student and Programme Office sign-ins. These local demo credentials are n
 | `evaluate.py` | Test set, a1 vs a2 comparison, audit/trace export; report is displayed in the UI |
 | `data/` | `handbook.md` (policy document), `students.json` (sample records) |
 
-## 3. Assignment 1 — concepts demonstrated
+## 3. Task 1 (Assignment 1) — Concepts Demonstrated
 | Requirement | Where |
 |---|---|
 | Agent loop decides tool vs direct answer | `agent.py → chat()` |
@@ -76,7 +77,7 @@ sample student and Programme Office sign-ins. These local demo credentials are n
 | Missing info / tool errors | Insufficient policy information + `try/except` in `ToolBox.run` |
 | Tracing (tools, latency, tokens, evidence) | `logs/traces.jsonl`, trace expander in UI |
 
-## 4. Assignment 2 — privacy & approval rules
+## 4. Task 2 (Assignment 2) — Privacy & Approval Rules
 1. **Identity** – the student ID comes from the login session, never from chat text. `ToolBox(session_student_id)`.
 2. **Authorization in code** – every private tool calls `security.authorize(session_id, target_id)`.
    If target ≠ signed-in student → `DENIED`, audited. Even if the LLM is tricked, the code blocks it.
@@ -87,8 +88,8 @@ sample student and Programme Office sign-ins. These local demo credentials are n
 5. **Audit log** – each important action stores: who (`actor`), what (`action`, `target`, `params`),
    decision (`ALLOWED / DENIED / PENDING_APPROVAL / APPROVED / REJECTED / SAVED / REFUSED`), result.
 
-## 5. Required scenarios → test IDs
-| Scenario | Test | Expected (a2) |
+## 5. Required Demonstration Scenarios (Task 1 & Task 2)
+| Scenario | Test | Expected (Task 2) |
 |---|---|---|
 | Own fee / scholarship status | T01, P01 | Allowed |
 | Another student's record | P02, P03 | Blocked + audited |
@@ -99,7 +100,7 @@ sample student and Programme Office sign-ins. These local demo credentials are n
 | New session recalls fact | T05 → T06 | Memory used |
 | Policy has no answer | T07 | "Not enough information" |
 
-## 6. Evaluation
+## 6. Evaluation (Task 1 vs Task 2)
 `python evaluate.py` creates `results/evaluation_report.md` (comparison table + per-test traces),
 `eval_a1.csv`, `eval_a2.csv`, `audit_log_a2.csv`, `approvals_a2.csv`, `traces_a2.jsonl`.
 
