@@ -1,0 +1,11 @@
+[
+  {"student_id": "S1001", "name": "Aarav Shah", "programme": "PGDM Big Data Analytics", "email": "aarav@college.edu",
+   "elective": "Deep Learning", "fee_total": 250000, "fee_paid": 250000, "fee_due_date": "2026-11-10",
+   "scholarship": "Merit Scholarship - Approved (25%)", "cgpa": 3.7},
+  {"student_id": "S1002", "name": "Diya Patel", "programme": "PGDM AI & Data Science", "email": "diya@college.edu",
+   "elective": "Marketing Analytics", "fee_total": 250000, "fee_paid": 150000, "fee_due_date": "2026-11-10",
+   "scholarship": "Need-Based Scholarship - Under Review", "cgpa": 3.2},
+  {"student_id": "S1003", "name": "Kabir Mehta", "programme": "PGDM Big Data Analytics", "email": "kabir@college.edu",
+   "elective": "Cloud Computing", "fee_total": 250000, "fee_paid": 0, "fee_due_date": "2026-11-10",
+   "scholarship": "None", "cgpa": 2.9}
+]

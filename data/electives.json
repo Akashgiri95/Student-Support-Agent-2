@@ -1,0 +1,18 @@
+{
+  "term_start_date": "2026-10-20",
+  "programmes": {
+    "PGDM Big Data Analytics": [
+      "Deep Learning",
+      "Natural Language Processing",
+      "Cloud Computing"
+    ],
+    "PGDM AI & Data Science": [
+      "Marketing Analytics",
+      "Natural Language Processing",
+      "Cloud Computing"
+    ]
+  },
+  "aliases": {
+    "nlp": "Natural Language Processing"
+  }
+}
