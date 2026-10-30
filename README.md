@@ -1,6 +1,4 @@
 # 🎓 Intelligent & Production-Aware Student Support Agent
-**PGDM (Big Data Analytics / Artificial Intelligence & Data Science) | Batch 2025–27**  
-**Course: Agentic AI Engineering — Task 1 (Assignment 1) & Task 2 (Assignment 2)**
 
 A production-aware AI agent designed to handle student administrative queries (tuition fees, scholarships, policy guidance, support tickets, and elective course changes) while enforcing institutional data privacy, role-based authorization in code, human-in-the-loop approval, and tamper-evident audit logging.
 
