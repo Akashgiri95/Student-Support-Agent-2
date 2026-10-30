@@ -1,6 +1,6 @@
 """LLM wrapper. Real mode: any OpenAI-compatible API. Mock mode: simple rule-based model
 (used when no API key is set, so the project and evaluation can run offline)."""
-import json, re
+import json, re, time
 import config, security
 
 # Every LLM reply is normalised to: {"content": str|None, "tool_calls": [...], "usage": {"in": int, "out": int}}
@@ -12,14 +12,29 @@ class OpenAILLM:
         self.client = OpenAI(api_key=config.LLM_API_KEY, base_url=config.LLM_BASE_URL)
         self.name = config.LLM_MODEL
 
-    def chat(self, messages, tools):
-        r = self.client.chat.completions.create(model=config.LLM_MODEL, messages=messages,
-                                                tools=tools, temperature=0)
-        msg = r.choices[0].message
-        calls = [{"id": c.id, "name": c.function.name, "args": json.loads(c.function.arguments or "{}")}
-                 for c in (msg.tool_calls or [])]
-        usage = {"in": r.usage.prompt_tokens, "out": r.usage.completion_tokens} if r.usage else {"in": 0, "out": 0}
-        return {"content": msg.content, "tool_calls": calls, "usage": usage}
+    def chat(self, messages, tools, max_retries=3):
+        delay = 1.0
+        last_exc = None
+        for attempt in range(max_retries):
+            try:
+                r = self.client.chat.completions.create(
+                    model=config.LLM_MODEL,
+                    messages=messages,
+                    tools=tools,
+                    temperature=0,
+                    timeout=30.0,
+                )
+                msg = r.choices[0].message
+                calls = [{"id": c.id, "name": c.function.name, "args": json.loads(c.function.arguments or "{}")}
+                         for c in (msg.tool_calls or [])]
+                usage = {"in": r.usage.prompt_tokens, "out": r.usage.completion_tokens} if r.usage else {"in": 0, "out": 0}
+                return {"content": msg.content, "tool_calls": calls, "usage": usage}
+            except Exception as exc:
+                last_exc = exc
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    delay *= 2.0
+        raise RuntimeError(f"LLM call failed after {max_retries} attempts: {last_exc}")
 
 
 class MockLLM:

@@ -11,7 +11,8 @@ STOP_WORDS = list(ENGLISH_STOP_WORDS | {"student", "students", "term", "policy"}
 
 class PolicyRetriever:
     def __init__(self, path=config.HANDBOOK_PATH):
-        text = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
         # One chunk = one "## Heading" section of the policy source
         self.chunks = []
         for i, part in enumerate(re.split(r"\n## ", text)[1:], start=1):

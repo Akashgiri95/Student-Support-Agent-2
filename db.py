@@ -34,6 +34,12 @@ def init_db(reset=False):
         id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT DEFAULT CURRENT_TIMESTAMP,
         actor TEXT, student_id TEXT, action TEXT, field TEXT, old_value TEXT,
         new_value TEXT, source TEXT, approval_id INTEGER);
+
+    CREATE INDEX IF NOT EXISTS idx_memories_student ON memories(student_id);
+    CREATE INDEX IF NOT EXISTS idx_tickets_student ON tickets(student_id);
+    CREATE INDEX IF NOT EXISTS idx_approvals_student ON approvals(student_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor);
+    CREATE INDEX IF NOT EXISTS idx_change_log_student ON student_change_log(student_id);
     """)
     if conn.execute("SELECT COUNT(*) FROM students").fetchone()[0] == 0:
         with open(config.STUDENTS_PATH) as f:
@@ -88,24 +94,25 @@ def update_student(student_id, updates, actor, source, approval_id=None):
     if not updates or not updates.keys() <= allowed_fields:
         raise ValueError("Student update contains no fields or an unsupported field.")
     conn = get_conn()
-    row = conn.execute("SELECT * FROM students WHERE student_id=?", (student_id,)).fetchone()
-    if not row:
+    try:
+        with conn:
+            row = conn.execute("SELECT * FROM students WHERE student_id=?", (student_id,)).fetchone()
+            if not row:
+                raise ValueError("Student record not found.")
+            before = dict(row)
+            for field, value in updates.items():
+                old_value = before[field]
+                if old_value == value:
+                    continue
+                conn.execute(f"UPDATE students SET {field}=? WHERE student_id=?", (value, student_id))
+                conn.execute(
+                    "INSERT INTO student_change_log(actor, student_id, action, field, old_value, new_value, source, approval_id) "
+                    "VALUES (?,?,?,?,?,?,?,?)",
+                    (actor, student_id, "UPDATE", field, str(old_value), str(value), source, approval_id),
+                )
+        return before
+    finally:
         conn.close()
-        raise ValueError("Student record not found.")
-    before = dict(row)
-    for field, value in updates.items():
-        old_value = before[field]
-        if old_value == value:
-            continue
-        conn.execute(f"UPDATE students SET {field}=? WHERE student_id=?", (value, student_id))
-        conn.execute(
-            "INSERT INTO student_change_log(actor, student_id, action, field, old_value, new_value, source, approval_id) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (actor, student_id, "UPDATE", field, str(old_value), str(value), source, approval_id),
-        )
-    conn.commit()
-    conn.close()
-    return before
 
 
 def add_student(student, actor):
@@ -113,11 +120,13 @@ def add_student(student, actor):
               "fee_due_date", "scholarship", "cgpa")
     values = tuple(student[field] for field in fields)
     conn = get_conn()
-    conn.execute(f"INSERT INTO students ({','.join(fields)}) VALUES ({','.join('?' for _ in fields)})", values)
-    conn.execute(
-        "INSERT INTO student_change_log(actor, student_id, action, field, old_value, new_value, source) "
-        "VALUES (?,?,?,?,?,?,?)",
-        (actor, student["student_id"], "CREATE", "record", None, json.dumps(student), "programme_office"),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        with conn:
+            conn.execute(f"INSERT INTO students ({','.join(fields)}) VALUES ({','.join('?' for _ in fields)})", values)
+            conn.execute(
+                "INSERT INTO student_change_log(actor, student_id, action, field, old_value, new_value, source) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (actor, student["student_id"], "CREATE", "record", None, json.dumps(student), "programme_office"),
+            )
+    finally:
+        conn.close()

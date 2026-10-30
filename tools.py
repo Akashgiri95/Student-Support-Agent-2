@@ -35,6 +35,11 @@ TOOL_SCHEMAS = [
 ]
 
 
+    # Whitelist of valid tool names — prevents getattr from dispatching to
+    # Python internals (__init__, __class__, etc.) if the LLM hallucinates.
+ALLOWED_TOOLS = {s["function"]["name"] for s in TOOL_SCHEMAS}
+
+
 class ToolBox:
     def __init__(self, session_student_id, mode="a2"):
         self.sid = session_student_id   # identity comes from login, NOT from the chat text
@@ -49,9 +54,11 @@ class ToolBox:
         return allowed, target, reason
 
     def run(self, name, args):
+        if name not in ALLOWED_TOOLS:
+            return {"error": f"Unknown tool '{name}'"}
         fn = getattr(self, name, None)
         if fn is None:
-            return {"error": f"Unknown tool '{name}'"}
+            return {"error": f"Tool '{name}' is not implemented."}
         try:
             return fn(**args)
         except Exception as e:          # tool errors are returned to the agent, not crashed
