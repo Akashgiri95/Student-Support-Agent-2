@@ -70,6 +70,16 @@ with st.sidebar:
                 st.error("Wrong staff password")
     if st.session_state.get("user"):
         st.caption(f"Signed in: {st.session_state.get('role', 'student')} · {st.session_state['user']}")
+
+    st.divider()
+    mode_selection = st.radio(
+        "Assignment Mode",
+        ["Assignment 2 (Safe Agent)", "Assignment 1 (Baseline)"],
+        index=0,
+        help="Switch between Assignment 1 baseline (no auth/approval) and Assignment 2 (production controls)."
+    )
+    current_mode = "a2" if "Assignment 2" in mode_selection else "a1"
+
     if st.button("Sign out"):
         st.session_state.clear()
         st.rerun()
@@ -89,11 +99,12 @@ else:
 if role == "student":
     user = st.session_state.get("user")
     agent = st.session_state.get("agent")
-    mode = "a2"
+    mode = current_mode
     if agent is None or agent.mode != mode:
         agent = st.session_state["agent"] = StudentSupportAgent(user, mode=mode)
     st.title("Student Support")
-    st.caption(f"Signed in as **{user}** · model **{agent.llm.name}**")
+    mode_label = "🛡️ Assignment 2 (Safe Controls)" if mode == "a2" else "⚠️ Assignment 1 (Baseline)"
+    st.caption(f"Signed in as **{user}** · Mode: **{mode_label}** · Model: **{agent.llm.name}**")
     for chat_role, text, _trace in st.session_state["chat"]:
         with st.chat_message(chat_role):
             st.write(_policy_wording(text) if chat_role == "assistant" else text)
