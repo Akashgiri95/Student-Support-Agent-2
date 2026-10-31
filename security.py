@@ -40,7 +40,7 @@ def audit(actor, action, target, params, decision, result):
 
 
 # ---------- 4. Human approval for sensitive actions ----------
-SENSITIVE_ACTIONS = {"change_elective"}
+SENSITIVE_ACTIONS = {"change_elective", "update_email"}
 
 
 def create_approval(student_id, action, params):
@@ -56,15 +56,15 @@ def decide_approval(approval_id: int, approve: bool, approver, reason="",
                     seat_available=False, prerequisites_met=False):
     """Called by the human approver (admin panel). Only APPROVED requests are executed."""
     if approver != "programme_office":
-        return "Only Programme Office can decide elective-change requests."
+        return "Only Programme Office can decide change requests."
     if not reason.strip():
         return "A decision note is required."
-    if approve and (not seat_available or not prerequisites_met):
-        return "Confirm seat availability and prerequisite review before approval."
     rows = db.query("SELECT * FROM approvals WHERE approval_id=?", (approval_id,))
     if not rows or rows[0]["status"] != "PENDING":
         return "Approval not found or already decided."
     req = rows[0]
+    if approve and req["action"] == "change_elective" and (not seat_available or not prerequisites_met):
+        return "Confirm seat availability and prerequisite review before approval."
     params = json.loads(req["params"])
     if approve:
         try:
@@ -96,4 +96,8 @@ def execute_sensitive_action(student_id, action, params, actor="system", source=
             student_id, params["new_elective"], request_created_at, approval_id)
         db.update_student(student_id, {"elective": new_elective}, actor, source, approval_id)
         return f"Elective changed to {new_elective}."
+    elif action == "update_email":
+        new_email = params["new_email"]
+        db.update_student(student_id, {"email": new_email}, actor, source, approval_id)
+        return f"Contact email changed to {new_email}."
     return "Unknown action."

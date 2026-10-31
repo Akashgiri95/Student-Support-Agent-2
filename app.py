@@ -174,11 +174,12 @@ if role == "student":
                             st.session_state[edit_key] = False
                             st.rerun()
                         else:
-                            db.update_student(user, {"email": email.strip()}, actor=user, source="self_service")
-                            security.audit(user, "update_contact_email", user, {"field": "email"},
-                                           "ALLOWED", "contact email updated")
+                            params = {"current_email": student["email"], "new_email": email.strip()}
+                            aid = security.create_approval(user, "update_email", params)
+                            security.audit(user, "request_email_update", user, params,
+                                           "PENDING_APPROVAL", f"approval #{aid} created, not executed")
                             st.session_state[edit_key] = False
-                            st.success("Contact email updated successfully!")
+                            st.success(f"Email update request #{aid} submitted to Programme Office for approval! Your email will update once approved.")
                             st.rerun()
 
     with tab_requests:
@@ -191,8 +192,12 @@ if role == "student":
         for request in requests:
             params = json.loads(request["params"])
             with st.container(border=True):
-                st.markdown(f"**Request #{request['approval_id']} · {request['status']}**")
-                st.write(f"{params.get('current_elective', 'Current elective')} → {params.get('new_elective', request['action'])}")
+                action_title = "Email Update" if request["action"] == "update_email" else "Elective Change"
+                st.markdown(f"**Request #{request['approval_id']} · {action_title} · {request['status']}**")
+                if request["action"] == "update_email":
+                    st.write(f"Email: **{params.get('current_email', '')}** → **{params.get('new_email', '')}**")
+                else:
+                    st.write(f"Course: **{params.get('current_elective', 'Current elective')}** → **{params.get('new_elective', request['action'])}**")
                 st.caption(f"Submitted {request['created_at']}")
                 if request["result"]:
                     st.write(request["result"])
@@ -212,8 +217,8 @@ if role == "student":
 # ---------------- Human approver ----------------
 if role == "staff":
     with tab_admin:
-        st.subheader("Pending elective-change requests")
-        st.caption("This queue shows student requests submitted from Student Support. Refresh this page if it was already open when a student submitted.")
+        st.subheader("Pending approval requests")
+        st.caption("This queue shows student requests (elective changes and email updates). Refresh this page if it was already open when a student submitted.")
         if st.button("Refresh approval queue", key="refresh_approval_queue"):
             st.rerun()
         pending = security.pending_approvals()
@@ -223,39 +228,63 @@ if role == "staff":
             params = json.loads(p["params"])
             student = db.get_student(p["student_id"])
             with st.container(border=True):
-                st.markdown(f"**Request #{p['approval_id']} · {student['name']} ({p['student_id']})**")
-                st.write(f"Current elective: **{params.get('current_elective', student['elective'])}**  ")
-                st.write(f"Requested elective: **{params['new_elective']}**")
-                st.caption(f"Submitted {p['created_at']} · {params.get('eligibility', 'Review policy before deciding.')}")
-                staff_check = academic.eligibility_summary(p["student_id"], params["new_elective"],
-                                                          p["created_at"], p["approval_id"])
-                if not staff_check["eligible"]:
-                    st.error(f"Eligibility recheck failed: {staff_check['message']}")
-                with st.expander("Decision checklist", expanded=True):
-                    seat_available = st.checkbox("Seat availability confirmed", key=f"seat_{p['approval_id']}")
-                    prerequisites_met = st.checkbox("Prerequisites and academic requirements checked", key=f"prereq_{p['approval_id']}")
+                if p["action"] == "update_email":
+                    st.markdown(f"**Request #{p['approval_id']} · Email Update · {student['name']} ({p['student_id']})**")
+                    st.write(f"Current email: **{params.get('current_email', student['email'])}**")
+                    st.write(f"Requested email: **{params['new_email']}**")
+                    st.caption(f"Submitted {p['created_at']}")
                     decision_note = st.text_input("Decision note (required)", key=f"decision_note_{p['approval_id']}")
-                approve_col, reject_col = st.columns(2)
-                if approve_col.button("Approve request", key=f"a{p['approval_id']}", type="primary"):
+                    approve_col, reject_col = st.columns(2)
+                    if approve_col.button("Approve email update", key=f"a{p['approval_id']}", type="primary"):
+                        if not decision_note.strip():
+                            st.error("Please add a decision note before approval.")
+                        else:
+                            result = security.decide_approval(p["approval_id"], True,
+                                                             approver=st.session_state["user"], reason=decision_note)
+                            st.success(result)
+                            st.rerun()
+                    if reject_col.button("Reject email update", key=f"r{p['approval_id']}"):
+                        if not decision_note.strip():
+                            st.error("Add a short reason so the student understands the decision.")
+                        else:
+                            result = security.decide_approval(p["approval_id"], False,
+                                                             approver=st.session_state["user"], reason=decision_note)
+                            st.warning(result)
+                            st.rerun()
+                else:
+                    st.markdown(f"**Request #{p['approval_id']} · Elective Change · {student['name']} ({p['student_id']})**")
+                    st.write(f"Current elective: **{params.get('current_elective', student['elective'])}**  ")
+                    st.write(f"Requested elective: **{params['new_elective']}**")
+                    st.caption(f"Submitted {p['created_at']} · {params.get('eligibility', 'Review policy before deciding.')}")
+                    staff_check = academic.eligibility_summary(p["student_id"], params["new_elective"],
+                                                              p["created_at"], p["approval_id"])
                     if not staff_check["eligible"]:
-                        st.error("This request no longer meets the configured eligibility rules.")
-                    elif not seat_available or not prerequisites_met or not decision_note.strip():
-                        st.error("Confirm seat availability and prerequisites, and add a decision note before approval.")
-                    else:
-                        result = security.decide_approval(p["approval_id"], True,
-                                                         approver=st.session_state["user"], reason=decision_note,
-                                                         seat_available=seat_available,
-                                                         prerequisites_met=prerequisites_met)
-                        st.success(result)
-                        st.rerun()
-                if reject_col.button("Reject request", key=f"r{p['approval_id']}"):
-                    if not decision_note.strip():
-                        st.error("Add a short reason so the student understands the decision.")
-                    else:
-                        result = security.decide_approval(p["approval_id"], False,
-                                                         approver=st.session_state["user"], reason=decision_note)
-                        st.warning(result)
-                        st.rerun()
+                        st.error(f"Eligibility recheck failed: {staff_check['message']}")
+                    with st.expander("Decision checklist", expanded=True):
+                        seat_available = st.checkbox("Seat availability confirmed", key=f"seat_{p['approval_id']}")
+                        prerequisites_met = st.checkbox("Prerequisites and academic requirements checked", key=f"prereq_{p['approval_id']}")
+                        decision_note = st.text_input("Decision note (required)", key=f"decision_note_{p['approval_id']}")
+                    approve_col, reject_col = st.columns(2)
+                    if approve_col.button("Approve request", key=f"a{p['approval_id']}", type="primary"):
+                        if not staff_check["eligible"]:
+                            st.error("This request no longer meets the configured eligibility rules.")
+                        elif not seat_available or not prerequisites_met or not decision_note.strip():
+                            st.error("Confirm seat availability and prerequisites, and add a decision note before approval.")
+                        else:
+                            result = security.decide_approval(p["approval_id"], True,
+                                                             approver=st.session_state["user"], reason=decision_note,
+                                                             seat_available=seat_available,
+                                                             prerequisites_met=prerequisites_met)
+                            st.success(result)
+                            st.rerun()
+                    if reject_col.button("Reject request", key=f"r{p['approval_id']}"):
+                        if not decision_note.strip():
+                            st.error("Add a short reason so the student understands the decision.")
+                        else:
+                            result = security.decide_approval(p["approval_id"], False,
+                                                             approver=st.session_state["user"], reason=decision_note)
+                            st.warning(result)
+                            st.rerun()
         with st.expander("Request history"):
             st.dataframe(pd.DataFrame(db.query("SELECT * FROM approvals ORDER BY approval_id DESC")),
                          use_container_width=True, hide_index=True)
