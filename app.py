@@ -133,23 +133,53 @@ if role == "student":
     with tab_profile:
         st.subheader("My profile")
         student = db.get_student(user)
-        st.write(f"**Student ID:** {student['student_id']}  \n**Name:** {student['name']}  \n**Programme:** {student['programme']}  \n**Current elective:** {student['elective']}")
-        with st.form("student_contact_form"):
-            email = st.text_input("Contact email", value=student["email"] or "")
-            confirmed = st.checkbox("I confirm this is the contact email I want on my student record.")
-            if st.form_submit_button("Save contact email"):
-                if not confirmed:
-                    st.error("Confirm the contact email before saving.")
-                elif not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()):
-                    st.error("Enter a valid email address.")
-                elif email.strip() == student["email"]:
-                    st.info("Your contact email is unchanged.")
-                else:
-                    db.update_student(user, {"email": email.strip()}, actor=user, source="self_service")
-                    security.audit(user, "update_contact_email", user, {"field": "email"},
-                                   "ALLOWED", "contact email updated")
-                    st.success("Contact email updated. The Programme Office can see the change in the record history.")
+        st.write(
+            f"**Student ID:** {student['student_id']}  \n"
+            f"**Name:** {student['name']}  \n"
+            f"**Programme:** {student['programme']}  \n"
+            f"**Current elective:** {student['elective']}"
+        )
+
+        edit_key = f"edit_email_mode_{user}"
+        is_editing = st.session_state.get(edit_key, False)
+
+        if not is_editing:
+            col_email, col_btn = st.columns([3, 1])
+            with col_email:
+                st.write(f"**Contact email:** {student['email']}")
+            with col_btn:
+                if st.button("✏️ Edit Email", key=f"btn_edit_{user}"):
+                    st.session_state[edit_key] = True
                     st.rerun()
+        else:
+            with st.container(border=True):
+                st.markdown("**Update Contact Email**")
+                with st.form("student_contact_form"):
+                    email = st.text_input("New contact email", value=student["email"] or "")
+                    confirmed = st.checkbox("I confirm this is the contact email I want on my student record.")
+                    col_save, col_cancel = st.columns([1, 1])
+                    submitted = col_save.form_submit_button("Save Changes", type="primary")
+                    cancelled = col_cancel.form_submit_button("Cancel")
+
+                    if cancelled:
+                        st.session_state[edit_key] = False
+                        st.rerun()
+                    if submitted:
+                        if not confirmed:
+                            st.error("Please confirm the checkbox before saving.")
+                        elif not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()):
+                            st.error("Enter a valid email address.")
+                        elif email.strip() == student["email"]:
+                            st.info("Your contact email is unchanged.")
+                            st.session_state[edit_key] = False
+                            st.rerun()
+                        else:
+                            db.update_student(user, {"email": email.strip()}, actor=user, source="self_service")
+                            security.audit(user, "update_contact_email", user, {"field": "email"},
+                                           "ALLOWED", "contact email updated")
+                            st.session_state[edit_key] = False
+                            st.success("Contact email updated successfully!")
+                            st.rerun()
 
     with tab_requests:
         st.subheader("My change requests")
