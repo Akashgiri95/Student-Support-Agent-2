@@ -105,8 +105,6 @@ if role == "student":
 
     with tab_chat:
         st.title("Student Support")
-        mode_label = "🛡️ Assignment 2 (Safe Controls)" if mode == "a2" else "⚠️ Assignment 1 (Baseline)"
-        st.caption(f"Signed in as **{user}** · Mode: **{mode_label}** · Model: **{agent.llm.name}**")
         for chat_role, text, _trace in st.session_state["chat"]:
             with st.chat_message(chat_role):
                 st.write(_policy_wording(text) if chat_role == "assistant" else text)
