@@ -10,11 +10,11 @@ TOOL_SCHEMAS = [
     {"type": "function", "function": {
         "name": "get_fee_status", "description": "Get fee paid, balance and due date for a student.",
         "parameters": {"type": "object", "properties": {
-            "student_id": {"type": "string", "description": "Student ID. Omit for the signed-in student."}}}}},
+            "student_id": {"type": ["string", "null"], "description": "Student ID. Omit or null for the signed-in student."}}}}},
     {"type": "function", "function": {
         "name": "get_scholarship_status", "description": "Get the scholarship status of a student.",
         "parameters": {"type": "object", "properties": {
-            "student_id": {"type": "string", "description": "Student ID. Omit for the signed-in student."}}}}},
+            "student_id": {"type": ["string", "null"], "description": "Student ID. Omit or null for the signed-in student."}}}}},
     {"type": "function", "function": {
         "name": "search_policy", "description": "Search student policies for rules and guidance.",
         "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
